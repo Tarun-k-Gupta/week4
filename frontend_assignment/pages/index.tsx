@@ -1,15 +1,41 @@
 import detectEthereumProvider from "@metamask/detect-provider"
 import { Strategy, ZkIdentity } from "@zk-kit/identity"
 import { generateMerkleProof, Semaphore } from "@zk-kit/protocols"
-import { providers } from "ethers"
+import { Contract, providers, utils } from "ethers"
 import Head from "next/head"
 import React from "react"
 import styles from "../styles/Home.module.css"
+import { useForm } from "react-hook-form";
+import { object, string, number } from 'yup';
+import abi from "./utils/Greeters.json";
+import { yupResolver } from '@hookform/resolvers/yup';
+
+const formSchema = object({
+    Name: string().required(),
+    Age: number().required().positive().integer(),
+    Address: string().required(),
+});
+
 
 export default function Home() {
+    const contractABI = abi.abi;
+    const { register, handleSubmit } = useForm({
+        resolver: yupResolver(formSchema)
+    });
     const [logs, setLogs] = React.useState("Connect your wallet and greet!")
+    const [Greet, setGreet] = React.useState("")
 
     async function greet() {
+
+        const contract = new Contract("0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512", contractABI)
+        const Provider = new providers.JsonRpcProvider("http://localhost:8545")
+
+        const contractOwner = contract.connect(Provider.getSigner())
+        contractOwner.on("NewGreeting", (greeting) => {
+            console.log(utils.parseBytes32String(greeting));
+            setGreet(utils.parseBytes32String(greeting));
+        })
+
         setLogs("Creating your Semaphore identity...")
 
         const provider = (await detectEthereumProvider()) as any
@@ -29,7 +55,6 @@ export default function Home() {
         setLogs("Creating your Semaphore proof...")
 
         const greeting = "Hello world"
-
         const witness = Semaphore.genWitness(
             identity.getTrapdoor(),
             identity.getNullifier(),
@@ -58,7 +83,7 @@ export default function Home() {
             setLogs("Your anonymous greeting is onchain :)")
         }
     }
-
+    const onSubmit = (data: any) => console.log(data);
     return (
         <div className={styles.container}>
             <Head>
@@ -77,7 +102,25 @@ export default function Home() {
                 <div onClick={() => greet()} className={styles.button}>
                     Greet
                 </div>
+                <h2>
+                    {Greet}
+                </h2>
             </main>
+            <form onSubmit={handleSubmit(onSubmit)}>
+                <h2>Form</h2>
+
+                <input {...register('Name')} placeholder="Name" className={styles.description} />
+                <br />
+
+                <input {...register('Address')} placeholder="Address" className={styles.description} />
+                <br />
+
+                <input {...register('Age')} placeholder="Age" className={styles.description} />
+                <br />
+
+                <input type="submit" className={styles.button} />
+            </form>
+
         </div>
     )
 }
